@@ -56,6 +56,13 @@ Workbook::~Workbook(){}
 
 Sheet::Sheet(){}
 
+Sheet::Sheet(const Sheet& ws)
+{
+	index = ws.GetIndex();
+	name = ws.GetName();
+	content = ws.GetContent();
+}
+
 Sheet::Sheet(String name)
 {
 	this->name = name;
@@ -74,11 +81,14 @@ Sheet::Sheet(int index, String name, String content)
 	this->content = content;
 }
 
-Sheet& Sheet::operator=(Sheet& ws)
+Sheet& Sheet::operator=(const Sheet& ws)
 {
 	index = ws.GetIndex();
 	name = ws.GetName();
 	content = ws.GetContent();
+	for(const Cell& c : ws.cells) {
+		cells.Add(c);
+	}
 	return *this;
 }
 

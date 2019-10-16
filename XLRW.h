@@ -28,10 +28,11 @@ class Sheet : public Upp::Moveable<Sheet>
 		Upp::String content;
 	public:
 		Sheet();
+		Sheet(const Sheet& ws);
 		Sheet(Upp::String name);
 		Sheet(int index, Upp::String name);
 		Sheet(int index, Upp::String name, Upp::String content);
-		Sheet& operator=(Sheet& ws);
+		Sheet& operator=(const Sheet& ws);
 		~Sheet();
 		
 		Upp::Vector<Cell> cells; // Error: Use of deleted function 'Sheet::Sheet(const Sheet&) -> Sans aucun probleme pour compiler

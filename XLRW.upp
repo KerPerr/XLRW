@@ -1,0 +1,12 @@
+uses
+	Core,
+	plugin/zip,
+	plugin/pcre;
+
+file
+	XLRW.h,
+	XLRW.cpp;
+
+mainconfig
+	"" = "";
+

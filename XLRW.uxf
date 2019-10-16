@@ -1,0 +1,19 @@
+<diagram program="umletino" version="14.3.0"><zoom_level>10</zoom_level><element><id>UMLClass</id><coordinates><x>140</x><y>190</y><w>210</w><h>190</h></coordinates><panel_attributes>Workbook
+--
+- Sheet [] sheets
+--
+- Open(String path) : Workbook
+- GetCount() : int
+- Sheet(int i) : Sheet
+- Sheet(String name) : Sheet</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>520</x><y>190</y><w>210</w><h>190</h></coordinates><panel_attributes>Sheet
+--
+- Cell [] cells
+--
+- Name() : String
+- Cell(int r, int c) : Cell</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>900</x><y>190</y><w>210</w><h>190</h></coordinates><panel_attributes>Cell
+--
+- value : String
+--
+- Value() : String
+- Row() : int
+- Column() : String / int</panel_attributes><additional_attributes></additional_attributes></element></diagram>

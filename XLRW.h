@@ -32,6 +32,8 @@ class Workbook
 		
 		Sheet sheet(int index);
 		Sheet sheet(Upp::String name);
+		
+		void AddSheet(Upp::String name);
 };
 
 class Sheet : public Upp::Moveable<Sheet>

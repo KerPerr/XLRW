@@ -37,6 +37,8 @@ Workbook::Workbook(String filePath)
 	}
 }
 
+Workbook::~Workbook(){}
+
 // Prévoire des exceptions si l'index ou le nom sont inexistant
 Sheet Workbook::sheet(int index)
 {
@@ -60,7 +62,36 @@ Sheet Workbook::sheet(Upp::String name)
 	return sheet;
 }
 
-Workbook::~Workbook(){}
+void Workbook::AddSheet(Upp::String name)
+{
+	// Je recupere l'ID le plus important
+	int res = 0;
+	XmlNode xn;
+	RegExp rgx("([a-zA-Z]+)");
+	xn = ParseXML(files.Get("xl/_rels/workbook.xml.rels"));
+	const XmlNode& rss = xn["Relationships"];
+	for(int i=0;i<rss.GetCount();i++) {
+		String val = rss[i].Attr("Id");
+		rgx.ReplaceGlobal(val, String(""));
+		if(stoi(val.ToStd()) > res)
+			res = stoi(val.ToStd());
+	}
+	
+	// J'ajoute dans le fichiers des relations ma nouvelle feuille
+	XmlNode& add = xn("Relationships").Add("Relationship");
+	add.SetAttr("Id", "rId" + AsString(res+1));
+	add.SetAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
+	add.SetAttr("Target", "worksheets/sheet"+AsString(sheets.GetCount()+1)+".xml");
+	files.Get("xl/_rels/workbook.xml.rels") = String(xn);
+	
+	//J'ajoute dans le fichier workbook
+	
+	//Je crée le fichier xml.
+	
+	for(int i=0;i<rss.GetCount();i++) {
+		Cout() << rss[i].Attr("Id") << " : "<< rss[i].Attr("Target") << EOL;
+	}
+}
 
 Sheet::Sheet(){}
 
@@ -157,7 +188,7 @@ int	Sheet::lastRow()
 	
     while(r1.GlobalMatch(range)) {}
 	if(r1.IsError())
-	    Cout() << r1.GetError() << '\n';
+	    Cout() << r1.GetError() << EOL;
 	
 	return stoi(r1[0].ToStd());
 }
@@ -176,7 +207,7 @@ int	Sheet::lastCol()
 			res = r1[i];
     }
 	if(r1.IsError())
-	    Cout() << r1.GetError() << '\n';
+	    Cout() << r1.GetError() << EOL;
 	
 	return ltoi(res);
 }
@@ -202,6 +233,15 @@ CONSOLE_APP_MAIN
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
 	Cout() << "Benchmark : " << duration << EOL;
 	
+	wb.AddSheet("COPY");
+	
+	Cout() << files.Get("xl/_rels/workbook.xml.rels") << EOL;
+	
+	for(int i=0;i<files.GetCount();i++) {
+		Cout() << files.GetKey(i) << EOL;
+	}
+	/*
 	Sheet ws = wb.sheet(4);
 	Cout() << "Out: " << ws.cell(3, 3).Value() << EOL;
+	*/
 }

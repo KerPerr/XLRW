@@ -1,6 +1,8 @@
 #ifndef _XLRW_XLRW_h_
 #define _XLRW_XLRW_h_
 
+#define STRINGIFY(...) #__VA_ARGS__
+
 class Workbook;
 class Sheet;
 class Cell;

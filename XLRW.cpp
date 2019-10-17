@@ -6,7 +6,7 @@
 
 #include <windows.h>
 #include "XLRW.h"
-#include "empty.xml"
+
 
 using namespace Upp;
 
@@ -103,7 +103,9 @@ void Workbook::AddSheet(Upp::String name)
 	files.Get("xl/workbook.xml") = AsXML(xn);
 	
 	// Je crée le fichier xml.
-	files.Add("xl/worksheets/sheet"+AsString(sheets.GetCount()+1)+".xml", ICI JE VEUX MON XML);
+	files.Add("xl/worksheets/sheet"+AsString(sheets.GetCount()+1)+".xml",
+		#include "empty.xml"
+	);
 	
 	// J'ajoute le fichier au vecteurs
 	Sheet sht(sheets.GetCount()+1, name);

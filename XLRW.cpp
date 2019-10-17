@@ -2,17 +2,20 @@
 #include <plugin/zip/zip.h>
 #include <plugin/pcre/Pcre.h>
 #include <chrono>
+#include <fstream>
 
 #include <windows.h>
 #include "XLRW.h"
+#include "empty.xml"
 
 using namespace Upp;
 
 Workbook::Workbook(String filePath)
 {
-	FileUnZip unzip(filePath);
+	file = filePath;
+	FileUnZip unzip(file);
 	XmlNode xn;
-	
+		
 	while(!(unzip.IsEof() || unzip.IsError())) {
 		String file = unzip.GetPath();
 		String content = unzip.ReadFile();
@@ -37,7 +40,14 @@ Workbook::Workbook(String filePath)
 	}
 }
 
-Workbook::~Workbook(){}
+Workbook::~Workbook()
+{
+	FileZip zip(file+".zip");
+	
+	for(int i=0;i<files.GetCount();i++){
+		zip.WriteFile(files[i], files.GetKey(i));
+	}
+}
 
 // Prévoire des exceptions si l'index ou le nom sont inexistant
 Sheet Workbook::sheet(int index)
@@ -78,19 +88,26 @@ void Workbook::AddSheet(Upp::String name)
 	}
 	
 	// J'ajoute dans le fichiers des relations ma nouvelle feuille
-	XmlNode& add = xn("Relationships").Add("Relationship");
-	add.SetAttr("Id", "rId" + AsString(res+1));
-	add.SetAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
-	add.SetAttr("Target", "worksheets/sheet"+AsString(sheets.GetCount()+1)+".xml");
-	files.Get("xl/_rels/workbook.xml.rels") = String(xn);
+	XmlNode& rel = xn("Relationships").Add("Relationship");
+	rel.SetAttr("Id", "rId" + AsString(res+1));
+	rel.SetAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
+	rel.SetAttr("Target", "worksheets/sheet"+AsString(sheets.GetCount()+1)+".xml");
+	files.Get("xl/_rels/workbook.xml.rels") = AsXML(xn);
 	
 	//J'ajoute dans le fichier workbook
+	xn = ParseXML(files.Get("xl/workbook.xml"));
+	XmlNode& ws = xn("workbook")("sheets").Add("sheet");
+	ws.SetAttr("name", name);
+	ws.SetAttr("sheetId", sheets.GetCount()+1);
+	ws.SetAttr("r:id", "rId"+AsString(res+1));
+	files.Get("xl/workbook.xml") = AsXML(xn);
 	
-	//Je crée le fichier xml.
+	// Je crée le fichier xml.
+	files.Add("xl/worksheets/sheet"+AsString(sheets.GetCount()+1)+".xml", ICI JE VEUX MON XML);
 	
-	for(int i=0;i<rss.GetCount();i++) {
-		Cout() << rss[i].Attr("Id") << " : "<< rss[i].Attr("Target") << EOL;
-	}
+	// J'ajoute le fichier au vecteurs
+	Sheet sht(sheets.GetCount()+1, name);
+	sheets.Add(sht);
 }
 
 Sheet::Sheet(){}
@@ -182,7 +199,7 @@ int	Sheet::lastRow()
 {
 	XmlNode xn = ParseXML(content);
 	const XmlNode& nodes = xn["worksheet"]["dimension"];
-	Cout() << "Attr: " << nodes.Attr("ref") << EOL;
+	//Cout() << "Attr: " << nodes.Attr("ref") << EOL;
 	RegExp r1("([0-9]+)");
 	String range = nodes.Attr("ref");
 	
@@ -235,11 +252,6 @@ CONSOLE_APP_MAIN
 	
 	wb.AddSheet("COPY");
 	
-	Cout() << files.Get("xl/_rels/workbook.xml.rels") << EOL;
-	
-	for(int i=0;i<files.GetCount();i++) {
-		Cout() << files.GetKey(i) << EOL;
-	}
 	/*
 	Sheet ws = wb.sheet(4);
 	Cout() << "Out: " << ws.cell(3, 3).Value() << EOL;

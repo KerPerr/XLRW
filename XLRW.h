@@ -24,6 +24,7 @@ int ltoi(Upp::String c)
 class Workbook
 {
 	private:
+		Upp::String file;
 	public:
 		Workbook(Upp::String filePath);
 		~Workbook();

@@ -5,6 +5,7 @@ uses
 
 file
 	XLRW.h,
+	empty.xml,
 	XLRW.cpp;
 
 mainconfig

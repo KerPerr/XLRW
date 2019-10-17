@@ -2,6 +2,8 @@
 #include <plugin/zip/zip.h>
 #include <plugin/pcre/Pcre.h>
 #include <chrono>
+
+#include <windows.h>
 #include "XLRW.h"
 
 using namespace Upp;
@@ -42,6 +44,9 @@ Sheet Workbook::sheet(int index)
 		if(sht.GetIndex() == index)
 			return sht;
 	}
+	MessageBox(0, "Feuille " + AsString(index) + " introuvable.", "Warning", MB_ICONWARNING | MB_OK);
+	Sheet sht(-1);
+	return sht;
 }
 
 Sheet Workbook::sheet(Upp::String name)
@@ -50,23 +55,26 @@ Sheet Workbook::sheet(Upp::String name)
 		if(sht.GetName() == name)
 			return sht;
 	}
+	MessageBox(0, "Feuille " + name + " introuvable.", "Warning", MB_ICONWARNING | MB_OK);
+	Sheet sheet(-1);
+	return sheet;
 }
 
 Workbook::~Workbook(){}
 
 Sheet::Sheet(){}
 
+Sheet::Sheet(int index){ this->index = index; }
+
 Sheet::Sheet(const Sheet& ws)
 {
 	index = ws.GetIndex();
 	name = ws.GetName();
 	content = ws.GetContent();
+	for(const Cell& c : ws.cells) { cells.Add(c); };
 }
 
-Sheet::Sheet(String name)
-{
-	this->name = name;
-}
+Sheet::Sheet(String name) { this->name = name; }
 
 Sheet::Sheet(int index, String name)
 {
@@ -76,9 +84,39 @@ Sheet::Sheet(int index, String name)
 
 Sheet::Sheet(int index, String name, String content)
 {
+	int r = 0;
+	int c = 0;
+	
+	RegExp col("([0-9]+)");
+	RegExp row("([A-Z]+)");
+	String clear = "";
+	
 	this->index = index;
 	this->name = name;
 	this->content = content;
+	
+	XmlNode xn = ParseXML(files.Get("xl/worksheets/sheet"+AsString(index+1)+".xml"));
+	const XmlNode& rows = xn["worksheet"]["sheetData"];
+	for(int i=0;i<rows.GetCount();i++) {
+		const XmlNode& nCells = rows[i];
+		for(int j=0;j<nCells.GetCount();j++) {
+			String cell = nCells[j].Attr("r");
+			String outRow = cell;
+			String outCol = cell;
+			//Cout() << "Cell: " << cell << ", Value: " << values[stoi(nCells[j]["v"][0].GetText().ToStd())] << EOL;
+			
+			row.ReplaceGlobal(outRow, clear);
+			r = stoi(outRow.ToStd());
+			
+			col.ReplaceGlobal(outCol, clear);
+			c = ltoi(outCol);
+			
+			Cell out(r, c , values[stoi(nCells[j]["v"][0].GetText().ToStd())]);
+			//Cout() << values[stoi(cells[j]["v"][0].GetText().ToStd())] << EOL;
+			
+			cells.Add(out);
+		}
+	}
 }
 
 Sheet& Sheet::operator=(const Sheet& ws)
@@ -93,22 +131,27 @@ Sheet& Sheet::operator=(const Sheet& ws)
 }
 
 Sheet::~Sheet(){}
-/*
+
 Cell Sheet::cell(int row, int col)
 {
 	for(Cell& c : cells) {
-		
+		if(c.row == row && c.col == col)
+			return c;
 	}
+	MessageBox(0, "Cellule introuvable.", "Warning", MB_ICONWARNING | MB_OK);
+	Cell cell(0, 0, "");
+	return cell;
 }
-*/
-String	Sheet::GetContent()	{ return content; };
-String	Sheet::GetName()	{ return name; };
-int		Sheet::GetIndex()	{ return index; };
+
+String	Sheet::GetContent()	const	{ return content; };
+String	Sheet::GetName()	const	{ return name; };
+int		Sheet::GetIndex()	const	{ return index; };
 
 int	Sheet::lastRow()
 {
 	XmlNode xn = ParseXML(content);
 	const XmlNode& nodes = xn["worksheet"]["dimension"];
+	Cout() << "Attr: " << nodes.Attr("ref") << EOL;
 	RegExp r1("([0-9]+)");
 	String range = nodes.Attr("ref");
 	
@@ -121,7 +164,6 @@ int	Sheet::lastRow()
 
 int	Sheet::lastCol()
 {
-	int ret = 0;
 	String res = "";
 	XmlNode xn = ParseXML(content);
 	const XmlNode& nodes = xn["worksheet"]["dimension"];
@@ -136,13 +178,7 @@ int	Sheet::lastCol()
 	if(r1.IsError())
 	    Cout() << r1.GetError() << '\n';
 	
-	char split[res.GetLength()+1];
-	strcpy(split, res.ToStd().c_str());
-	
-	for(int i=0;i<res.GetLength();i++)
-        ret += (int)res[i] - 64;
-	
-	return res.GetLength() > 1 ? ret + res.GetLength() * 26 - 27 : ret ;
+	return ltoi(res);
 }
 
 Cell::Cell(){}
@@ -154,6 +190,8 @@ Cell::Cell(int row, int col, String value)
 }
 Cell::~Cell(){};
 
+String Cell::Value() { return value; };
+
 CONSOLE_APP_MAIN
 {
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -164,6 +202,6 @@ CONSOLE_APP_MAIN
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
 	Cout() << "Benchmark : " << duration << EOL;
 	
-	Sheet ws = wb.sheet(1);
-	Cout() << "Name: " << ws.GetName() << EOL;
+	Sheet ws = wb.sheet(4);
+	Cout() << "Out: " << ws.cell(3, 3).Value() << EOL;
 }

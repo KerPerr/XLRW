@@ -5,11 +5,25 @@ class Workbook;
 class Sheet;
 class Cell;
 
+Upp::VectorMap<Upp::String, Upp::String> files;
+Upp::Vector<Upp::String> values;
+
+int ltoi(Upp::String c)
+{
+	int ret = 0;
+	
+	char split[c.GetLength()+1];
+	strcpy(split, c.ToStd().c_str());
+	
+	for(int i=0;i<c.GetLength();i++)
+        ret += (int)c[i] - 64;
+	
+	return c.GetLength() > 1 ? ret + c.GetLength() * 26 - 27 : ret ;
+};
+
 class Workbook
 {
 	private:
-		Upp::Vector<Upp::String> values;
-		Upp::VectorMap<Upp::String, Upp::String> files;
 	public:
 		Workbook(Upp::String filePath);
 		~Workbook();
@@ -28,6 +42,7 @@ class Sheet : public Upp::Moveable<Sheet>
 		Upp::String content;
 	public:
 		Sheet();
+		Sheet(int index);
 		Sheet(const Sheet& ws);
 		Sheet(Upp::String name);
 		Sheet(int index, Upp::String name);
@@ -35,30 +50,34 @@ class Sheet : public Upp::Moveable<Sheet>
 		Sheet& operator=(const Sheet& ws);
 		~Sheet();
 		
-		Upp::Vector<Cell> cells; // Error: Use of deleted function 'Sheet::Sheet(const Sheet&) -> Sans aucun probleme pour compiler
-		Upp::String GetContent();
-		Upp::String GetName();
-		int GetIndex();
+		Upp::String GetContent() const;
+		Upp::String GetName() const;
+		int GetIndex() const;
 		
 		int lastRow();
 		int lastCol();
+		
+		Upp::Vector<Cell> cells; // Error: Use of deleted function 'Sheet::Sheet(const Sheet&) -> Sans aucun probleme pour compiler
+		Cell cell(int row, int col);
 };
 
 class Cell : public Upp::Moveable<Cell>
 {
 	private:
-		int row = 0;
-		int col = 0;
 		Upp::String value;
 	public:
+		int row = 0;
+		int col = 0;
+		
 		Cell();
 		Cell(int row, int col, Upp::String value);
 		~Cell();
 		/*
 		int GetRow();
 		int GetCol();
-		
+		*/
 		Upp::String Value();
+		/*
 		void Value(Upp::String val);
 		void Value(int val);
 		*/

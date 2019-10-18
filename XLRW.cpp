@@ -7,7 +7,6 @@
 #include <windows.h>
 #include "XLRW.h"
 
-
 using namespace Upp;
 
 Workbook::Workbook(String filePath)
@@ -42,7 +41,7 @@ Workbook::Workbook(String filePath)
 
 Workbook::~Workbook()
 {
-	FileZip zip(file+".zip");
+	FileZip zip(file);
 	
 	for(int i=0;i<files.GetCount();i++){
 		zip.WriteFile(files[i], files.GetKey(i));
@@ -87,20 +86,48 @@ void Workbook::AddSheet(Upp::String name)
 			res = stoi(val.ToStd());
 	}
 	
-	// J'ajoute dans le fichiers des relations ma nouvelle feuille
-	XmlNode& rel = xn("Relationships").Add("Relationship");
-	rel.SetAttr("Id", "rId" + AsString(res+1));
-	rel.SetAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
-	rel.SetAttr("Target", "worksheets/sheet"+AsString(sheets.GetCount()+1)+".xml");
-	files.Get("xl/_rels/workbook.xml.rels") = AsXML(xn);
+	// J'ajoute dans le fichiers des relations ma nouvelle feuille et je modifie les rId ...
+	XmlNode& rel = xn("Relationships");
+	
+	int count = rel.GetCount();
+	while(rel.GetCount()>0){
+		rel.Remove(0);
+	}
+	
+	for(int i=1;i<=sheets.GetCount()+1;i++){
+		XmlNode& rl = rel.Add("Relationship");
+		rl.SetAttr("Id", "rId" + AsString(i));
+		rl.SetAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
+		rl.SetAttr("Target", "worksheets/sheet"+ AsString(i) +".xml");
+	}
+	
+	XmlNode& theme = rel.Add("Relationship");
+	theme.SetAttr("Id", "rId" + AsString(sheets.GetCount()+2));
+	theme.SetAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme");
+	theme.SetAttr("Target", "theme/theme1.xml");
+	
+	XmlNode& style = rel.Add("Relationship");
+	style.SetAttr("Id", "rId" + AsString(sheets.GetCount()+3));
+	style.SetAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles");
+	style.SetAttr("Target", "styles.xml");
+	
+	XmlNode& ss = rel.Add("Relationship");
+	ss.SetAttr("Id", "rId" + AsString(sheets.GetCount()+4));
+	ss.SetAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings");
+	ss.SetAttr("Target", "sharedStrings.xml");
+	
+	//Cout() << AsXML(xn, XML_HEADER | XML_PRETTY) << EOL;
+	
+	files.Get("xl/_rels/workbook.xml.rels") = AsXML(xn, XML_HEADER);
 	
 	//J'ajoute dans le fichier workbook
 	xn = ParseXML(files.Get("xl/workbook.xml"));
 	XmlNode& ws = xn("workbook")("sheets").Add("sheet");
 	ws.SetAttr("name", name);
 	ws.SetAttr("sheetId", sheets.GetCount()+1);
-	ws.SetAttr("r:id", "rId"+AsString(res+1));
-	files.Get("xl/workbook.xml") = AsXML(xn);
+	ws.SetAttr("r:id", "rId" + AsString(sheets.GetCount()+1));
+	Cout() << AsXML(xn, XML_HEADER) << EOL;
+	files.Get("xl/workbook.xml") = AsXML(xn, XML_HEADER);
 	
 	// Je crée le fichier xml.
 	files.Add("xl/worksheets/sheet"+AsString(sheets.GetCount()+1)+".xml",
@@ -252,7 +279,7 @@ CONSOLE_APP_MAIN
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
 	Cout() << "Benchmark : " << duration << EOL;
 	
-	wb.AddSheet("COPY");
+	wb.AddSheet("LAST");
 	
 	/*
 	Sheet ws = wb.sheet(4);

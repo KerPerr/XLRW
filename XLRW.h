@@ -23,6 +23,21 @@ int ltoi(Upp::String c)
 	return c.GetLength() > 1 ? ret + c.GetLength() * 26 - 27 : ret ;
 };
 
+Upp::String itol(int val)
+{
+	int dividend = val;
+    Upp::String col = "";
+    int modulo = 0;
+
+    while (dividend > 0) {
+        modulo = (dividend - 1) % 26;
+        col = Upp::AsString(char(65 + modulo)) + col;
+        dividend = (int)((dividend - modulo) / 26);
+    } 
+
+    return col;
+}
+
 class Workbook
 {
 	private:

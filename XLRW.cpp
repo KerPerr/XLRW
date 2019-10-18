@@ -268,7 +268,17 @@ Cell::Cell(int row, int col, String value)
 Cell::~Cell(){};
 
 String Cell::Value() { return value; };
-
+/*
+void Cell::Value(String value)
+{
+	this->value = value;
+	/**
+	* Check si value est présent dans sharedString
+	* si oui recuperer son index
+	* sinon ajouter la valeur et recupérer son index
+	**/
+}
+*/
 CONSOLE_APP_MAIN
 {
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -279,7 +289,7 @@ CONSOLE_APP_MAIN
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
 	Cout() << "Benchmark : " << duration << EOL;
 	
-	wb.AddSheet("LAST");
+	//wb.AddSheet("LAST");
 	
 	/*
 	Sheet ws = wb.sheet(4);

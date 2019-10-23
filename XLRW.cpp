@@ -1,7 +1,5 @@
-#include <Core/Core.h>
 #include <plugin/zip/zip.h>
 #include <plugin/pcre/Pcre.h>
-#include <chrono>
 #include <fstream>
 
 #include <windows.h>
@@ -21,80 +19,111 @@ Workbook::Workbook(String filePath)
 		files.Add(file, content);
 	}
 	
-	// Recupère les valeurs présentes dans les différentes sheets
 	xn = ParseXML(files.Get("xl/sharedStrings.xml"));
 	const XmlNode& val = xn["sst"];
 	for(int i=0;i<val.GetCount();i++) {
-		//Cout() << val[i]["t"][0].GetText() << EOL;
 		values.Add(val[i]["t"][0].GetText());
 	}
 	
-	// Recupère les noms des différentes sheets
 	xn = ParseXML(files.Get("xl/workbook.xml"));
-	const XmlNode& shts = xn["workbook"]["sheets"];
-	for(int i=0;i<shts.GetCount();i++) {
-		//Cout() << shts[i].Attr("name") << EOL;
-		Sheet ws(i, shts[i].Attr("name"), files.Get("xl/worksheets/sheet"+AsString(i+1)+".xml"));
-		sheets.Add(ws);
+	const XmlNode& xnws = xn["workbook"]["sheets"];
+	for(int i=0;i<xnws.GetCount();i++) {
+		sheets.Create(this, i, xnws[i].Attr("name"), files.Get("xl/worksheets/sheet"+AsString(i+1)+".xml"));
 	}
 }
 
 Workbook::~Workbook()
 {
-	FileZip zip(file);
 	
-	for(int i=0;i<files.GetCount();i++){
-		zip.WriteFile(files[i], files.GetKey(i));
-	}
 }
 
-// Prévoire des exceptions si l'index ou le nom sont inexistant
-Sheet Workbook::sheet(int index)
+Sheet& Workbook::sheet(int index)
 {
-	for(Sheet& sht : sheets) {
-		if(sht.GetIndex() == index)
-			return sht;
+	for(Sheet& ws : sheets) {
+		if(ws.GetIndex() == index) {
+			return ws;
+		}
 	}
 	MessageBox(0, "Feuille " + AsString(index) + " introuvable.", "Warning", MB_ICONWARNING | MB_OK);
-	Sheet sht(-1);
-	return sht;
+	throw std::exception();
 }
 
-Sheet Workbook::sheet(Upp::String name)
+Sheet& Workbook::sheet(Upp::String name)
 {
-	for(Sheet& sht : sheets) {
-		if(sht.GetName() == name)
-			return sht;
+	for(Sheet& ws : sheets) {
+		if(ws.GetName().IsEqual(name)) {
+			return ws;
+		}
 	}
 	MessageBox(0, "Feuille " + name + " introuvable.", "Warning", MB_ICONWARNING | MB_OK);
-	Sheet sheet(-1);
-	return sheet;
+	throw std::exception();
 }
 
-void Workbook::AddSheet(Upp::String name)
+Sheet& Workbook::AddSheet(Upp::String name)
 {
-	// Je recupere l'ID le plus important
-	int res = 0;
-	XmlNode xn;
-	RegExp rgx("([a-zA-Z]+)");
-	xn = ParseXML(files.Get("xl/_rels/workbook.xml.rels"));
-	const XmlNode& rss = xn["Relationships"];
-	for(int i=0;i<rss.GetCount();i++) {
-		String val = rss[i].Attr("Id");
-		rgx.ReplaceGlobal(val, String(""));
-		if(stoi(val.ToStd()) > res)
-			res = stoi(val.ToStd());
+	for(Sheet& s : sheets) {
+		if(s.GetName() == name) {
+			MessageBox(0, "Feuille " + name + " existante.", "Warning", MB_ICONWARNING | MB_OK);
+			return s;
+		}
 	}
 	
-	// J'ajoute dans le fichiers des relations ma nouvelle feuille et je modifie les rId ...
+	XmlNode xn = ParseXML(files.Get("xl/workbook.xml"));
+	XmlNode& ws = xn("workbook")("sheets").Add("sheet");
+	ws.SetAttr("name", name);
+	ws.SetAttr("sheetId", sheets.GetCount()+1);
+	ws.SetAttr("r:id", "rId" + AsString(sheets.GetCount()+1));
+	//Cout() << AsXML(xn, XML_HEADER) << EOL;
+	files.Get("xl/workbook.xml") = AsXML(xn, XML_HEADER);
+	
+	files.Add("xl/worksheets/sheet" + AsString(sheets.GetCount()+1) + ".xml",
+		#include "empty.xml"
+	);
+	return sheets.Create(this, sheets.GetCount(), name,
+		#include "empty.xml"
+	);
+}
+
+int Workbook::GetIndex(String value)
+{
+	for(int i=0;i<values.GetCount();i++){
+		if(values[i].IsEqual(value))
+			return i;
+	}
+	
+	if(value.GetCount() > 0) {
+		values.Add(value);
+		// Reconstuire sharedStrings.xml
+		XmlNode xn = ParseXML(files.Get("xl/sharedStrings.xml"));
+		XmlNode& data = xn("sst");
+
+		while(data.GetCount() > 0){
+			data.Remove(0);
+		}
+		
+		for(String& s : values) {
+			XmlNode& xnsi = data.Add("si");
+			XmlNode& xnt = xnsi.Add("t");
+			xnt.AddText(s);
+		}
+		files.Get("xl/sharedStrings.xml") = AsXML(xn, XML_HEADER);
+		return values.GetCount()-1;
+	}
+	MessageBox(0, "GetIndex !", "Warning", MB_ICONWARNING | MB_OK);
+	throw std::exception();
+}
+
+void Workbook::Update()
+{
+	XmlNode xn;
+	xn = ParseXML(files.Get("xl/_rels/workbook.xml.rels"));
 	XmlNode& rel = xn("Relationships");
 	
-	int count = rel.GetCount();
-	while(rel.GetCount()>0){
+	while(rel.GetCount() > 0){
 		rel.Remove(0);
 	}
 	
-	for(int i=1;i<=sheets.GetCount()+1;i++){
+	for(int i=1;i<=sheets.GetCount()+1;i++) {
 		XmlNode& rl = rel.Add("Relationship");
 		rl.SetAttr("Id", "rId" + AsString(i));
 		rl.SetAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet");
@@ -119,29 +148,25 @@ void Workbook::AddSheet(Upp::String name)
 	//Cout() << AsXML(xn, XML_HEADER | XML_PRETTY) << EOL;
 	
 	files.Get("xl/_rels/workbook.xml.rels") = AsXML(xn, XML_HEADER);
+}
+
+void Workbook::Save()
+{
+	// Reconstruire la structure des fichiers a partir de chacun des vecteurs
+	for(Sheet& ws : sheets) {
+		ws.Save();
+		files.Get("xl/worksheets/sheet" + AsString(ws.GetIndex()+1) + ".xml") = ws.GetContent();
+	}
+	Update();
 	
-	//J'ajoute dans le fichier workbook
-	xn = ParseXML(files.Get("xl/workbook.xml"));
-	XmlNode& ws = xn("workbook")("sheets").Add("sheet");
-	ws.SetAttr("name", name);
-	ws.SetAttr("sheetId", sheets.GetCount()+1);
-	ws.SetAttr("r:id", "rId" + AsString(sheets.GetCount()+1));
-	Cout() << AsXML(xn, XML_HEADER) << EOL;
-	files.Get("xl/workbook.xml") = AsXML(xn, XML_HEADER);
+	FileZip zip(file);
 	
-	// Je crée le fichier xml.
-	files.Add("xl/worksheets/sheet"+AsString(sheets.GetCount()+1)+".xml",
-		#include "empty.xml"
-	);
-	
-	// J'ajoute le fichier au vecteurs
-	Sheet sht(sheets.GetCount()+1, name);
-	sheets.Add(sht);
+	for(int i=0;i<files.GetCount();i++){
+		zip.WriteFile(files[i], files.GetKey(i));
+	}
 }
 
 Sheet::Sheet(){}
-
-Sheet::Sheet(int index){ this->index = index; }
 
 Sheet::Sheet(const Sheet& ws)
 {
@@ -151,18 +176,11 @@ Sheet::Sheet(const Sheet& ws)
 	for(const Cell& c : ws.cells) { cells.Add(c); };
 }
 
-Sheet::Sheet(String name) { this->name = name; }
-
-Sheet::Sheet(int index, String name)
-{
-	this->index = index;
-	this->name = name;
-}
-
-Sheet::Sheet(int index, String name, String content)
+Sheet::Sheet(Workbook* wb, int index, String name, String content)
 {
 	int r = 0;
 	int c = 0;
+	parent = wb;
 	
 	RegExp col("([0-9]+)");
 	RegExp row("([A-Z]+)");
@@ -172,15 +190,14 @@ Sheet::Sheet(int index, String name, String content)
 	this->name = name;
 	this->content = content;
 	
-	XmlNode xn = ParseXML(files.Get("xl/worksheets/sheet"+AsString(index+1)+".xml"));
-	const XmlNode& rows = xn["worksheet"]["sheetData"];
-	for(int i=0;i<rows.GetCount();i++) {
-		const XmlNode& nCells = rows[i];
-		for(int j=0;j<nCells.GetCount();j++) {
-			String cell = nCells[j].Attr("r");
+	XmlNode xn = ParseXML(content);
+	const XmlNode& xnr = xn["worksheet"]["sheetData"];
+	for(int i=0;i<xnr.GetCount();i++) {
+		const XmlNode& xnc = xnr[i];
+		for(int j=0;j<xnc.GetCount();j++) {
+			String cell = xnc[j].Attr("r");
 			String outRow = cell;
 			String outCol = cell;
-			//Cout() << "Cell: " << cell << ", Value: " << values[stoi(nCells[j]["v"][0].GetText().ToStd())] << EOL;
 			
 			row.ReplaceGlobal(outRow, clear);
 			r = stoi(outRow.ToStd());
@@ -188,10 +205,7 @@ Sheet::Sheet(int index, String name, String content)
 			col.ReplaceGlobal(outCol, clear);
 			c = ltoi(outCol);
 			
-			Cell out(r, c , values[stoi(nCells[j]["v"][0].GetText().ToStd())]);
-			//Cout() << values[stoi(cells[j]["v"][0].GetText().ToStd())] << EOL;
-			
-			cells.Add(out);
+			cells.Create(r, c , parent->values[stoi(xnc[j]["v"][0].GetText().ToStd())]);
 		}
 	}
 }
@@ -209,15 +223,30 @@ Sheet& Sheet::operator=(const Sheet& ws)
 
 Sheet::~Sheet(){}
 
-Cell Sheet::cell(int row, int col)
+Cell& Sheet::cell(int row, int col)
 {
 	for(Cell& c : cells) {
-		if(c.row == row && c.col == col)
+		if(c.row == row && c.col == col) {
 			return c;
+		}
 	}
-	MessageBox(0, "Cellule introuvable.", "Warning", MB_ICONWARNING | MB_OK);
-	Cell cell(0, 0, "");
-	return cell;
+	
+	Cell& c = cells.Create(row, col, "");
+	c.setParent(this);
+	return c;
+}
+
+Cell& Sheet::cell(int row, String col)
+{
+	for(Cell& c : cells) {
+		if(c.row == row && c.col == ltoi(col)) {
+			return c;
+		}
+	}
+	
+	Cell& c = cells.Create(row, ltoi(col), "");
+	c.setParent(this);
+	return c;
 }
 
 String	Sheet::GetContent()	const	{ return content; };
@@ -228,7 +257,7 @@ int	Sheet::lastRow()
 {
 	XmlNode xn = ParseXML(content);
 	const XmlNode& nodes = xn["worksheet"]["dimension"];
-	//Cout() << "Attr: " << nodes.Attr("ref") << EOL;
+	
 	RegExp r1("([0-9]+)");
 	String range = nodes.Attr("ref");
 	
@@ -247,7 +276,6 @@ int	Sheet::lastCol()
 	RegExp r1("([A-Z]+)");
 	String range = nodes.Attr("ref");
 	
-    //while(r1.GlobalMatch(range)) {}
     while(r1.GlobalMatch(range)) {
 		for(int i = 0; i < r1.GetCount(); i++)
 			res = r1[i];
@@ -256,6 +284,51 @@ int	Sheet::lastCol()
 	    Cout() << r1.GetError() << EOL;
 	
 	return ltoi(res);
+}
+
+void Sheet::Save()
+{
+	XmlNode xn = ParseXML(content);
+	XmlNode& data = xn("worksheet")("sheetData");
+	
+	while(data.GetCount() > 0){
+		data.Remove(0);
+	}
+		
+	Sort(cells, [](const Cell& a, const Cell& b) { return ((a.row==b.row) ? a.col < b.col : a.row < b.row); });
+	int current = 0;
+	for(Cell& c : cells) {
+		if(current != c.row) {
+			current = c.row;
+			XmlNode& xnr = data.Add("row");
+			xnr.SetAttr("r", c.row);
+			xnr.SetAttr("spans", "1:4");
+			xnr.SetAttr("x14ac:dyDescent", "0.25");
+			
+			XmlNode& xnc = xnr.Add("c");
+			xnc.SetAttr("r", itol(c.col) + AsString(c.row));
+			xnc.SetAttr("t", "s");
+			
+			XmlNode& xnv = xnc.Add("v");
+			
+			xnv.AddText(AsString(parent->GetIndex(c.Value())));
+		} else {
+			int i = 0;
+			for(const XmlNode& xnr : data) {
+				if(xnr.Attr("r").IsEqual(AsString(c.row))) {
+					XmlNode& xnc = data.At(i).Add("c");
+					xnc.SetAttr("r", itol(c.col) + AsString(c.row));
+					xnc.SetAttr("t", "s");
+					XmlNode& xnv = xnc.Add("v");
+					xnv.AddText(AsString(parent->GetIndex(c.Value())));
+				}
+				i++;
+			}
+		}
+	}
+	
+	content = AsXML(xn, XML_HEADER);
+	parent->files.Get("xl/worksheets/sheet" + AsString(GetIndex()+1) + ".xml") = content;
 }
 
 Cell::Cell(){}
@@ -268,31 +341,18 @@ Cell::Cell(int row, int col, String value)
 Cell::~Cell(){};
 
 String Cell::Value() { return value; };
+
+void Cell::setParent(Sheet* ws) { this->parent = ws; }
+void Cell::Value(String value) { this->value = value; }
+void Cell::Value(int value) { this->value = AsString(value); }
+
 /*
-void Cell::Value(String value)
-{
-	this->value = value;
-	/**
-	* Check si value est présent dans sharedString
-	* si oui recuperer son index
-	* sinon ajouter la valeur et recupérer son index
-	**/
-}
-*/
 CONSOLE_APP_MAIN
 {
-	auto t1 = std::chrono::high_resolution_clock::now();
-	
 	Workbook wb("C:\\Users\\CASTREC\\Documents\\XML XL\\XML.xlsx");
 	
-	auto t2 = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
-	Cout() << "Benchmark : " << duration << EOL;
-	
-	//wb.AddSheet("LAST");
-	
-	/*
-	Sheet ws = wb.sheet(4);
-	Cout() << "Out: " << ws.cell(3, 3).Value() << EOL;
-	*/
+	wb.sheet(1).cell(1, "B").Value("CHANGE");
+	wb.AddSheet("Quatrieme").cell(1, 1).Value("DID IT");
+	wb.Save();
 }
+*/

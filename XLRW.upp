@@ -1,12 +1,12 @@
 uses
-	Core,
 	plugin/zip,
-	plugin/pcre;
+	plugin/pcre,
+	Core;
 
 file
 	XLRW.h,
-	empty.xml,
-	XLRW.cpp;
+	XLRW.cpp,
+	empty.xml;
 
 mainconfig
 	"" = "";
